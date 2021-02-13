@@ -37,6 +37,19 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+extern uint8_t SensorReadRequest;
+
+struct pcc {
+		float accelDataX;
+		float accelDataY;
+	 	float accelDataZ;
+		float gyroDataX;
+		float gyroDataY;
+	 	float gyroDataZ;
+ }pcc;
+
+ extern struct pcc PCC_1;
+
 
 /* USER CODE END ET */
 

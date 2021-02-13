@@ -14,7 +14,24 @@
 #include "freertos/task.h"
 #endif
 
-#define STRING_BUFFER_LEN 50
+
+// Bobby Code Start //
+#include "cmsis_os.h"
+#include "FreeRTOS.h"
+#include "portable.h"
+#include "queue.h"
+#include "task.h"
+#include "timers.h"
+#include "main.h"
+
+#include <geometry_msgs/msg/point32.h>
+#include <geometry_msgs/msg/accel.h>
+#include <sensor_msgs/msg/imu.h>
+#define STRING_BUFFER_LEN 100
+//#define STRING_BUFFER_LEN 50
+xQueueHandle PCC_Queue_Handle;
+// Bobby Code End //
+
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Aborting.\n",__LINE__,(int)temp_rc); vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Continuing.\n",__LINE__,(int)temp_rc);}}
@@ -27,6 +44,11 @@ rcl_subscription_t pong_subscriber;
 std_msgs__msg__Header incoming_ping;
 std_msgs__msg__Header outcoming_ping;
 std_msgs__msg__Header incoming_pong;
+
+// Bobby Code Start //
+rcl_publisher_t imu_publisher;
+geometry_msgs__msg__Quaternion imu_data;
+// Bobby Code End //
 
 int device_id;
 int seq_no;
@@ -52,6 +74,24 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 		pong_count = 0;
 		rcl_publish(&ping_publisher, (const void*)&outcoming_ping, NULL);
 		printf("Ping send seq %s\n", outcoming_ping.frame_id.data);
+
+
+		if(xQueueReceive(PCC_Queue_Handle, &PCC_1, 100)){
+						// Publish IMU
+						imu_data.x = PCC_1.accelDataX;
+						imu_data.y = PCC_1.accelDataY;
+						imu_data.z = PCC_1.accelDataZ;
+
+
+						//imu_data.linear.x = PCC_1.accelDataX;
+					    //imu_data.linear.y = PCC_1.accelDataY;
+						//imu_data.linear.z = PCC_1.accelDataZ;
+						//imu_data.angular.x = PCC_1.gyroDataX;
+						//imu_data.angular.y = PCC_1.gyroDataY;
+						//imu_data.angular.z = PCC_1.gyroDataZ;
+						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
+						rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
+				}
 	}
 }
 
@@ -76,6 +116,8 @@ void pong_subscription_callback(const void * msgin)
 		printf("Pong for seq %s (%d)\n", msg->frame_id.data, pong_count);
 	}
 }
+
+
 
 
 void appMain(void *argument)
@@ -106,10 +148,23 @@ void appMain(void *argument)
 	RCCHECK(rclc_subscription_init_best_effort(&pong_subscriber, &node,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Header), "/microROS/pong"));
 
-
-	// Create a 3 seconds ping timer timer,
+	// Create a 1000 milli seconds ping timer timer,
 	rcl_timer_t timer;
-	RCCHECK(rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(2000), ping_timer_callback));
+	RCCHECK(rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(1000), ping_timer_callback));
+
+
+	// Bobby Code Start //
+	// Create a best effort pong publisher
+	RCCHECK(rclc_publisher_init_best_effort(&imu_publisher, &node,
+					ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Quaternion), "/geometry/quaternion"));
+
+
+//	rcl_publisher_init(&imu_publisher, &node,
+	//		ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Quaternion), "/geometry/quaternion", &imu_publisher_ops);
+
+
+
+	// Bobby Code End //
 
 
 	// Create executor

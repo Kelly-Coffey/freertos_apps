@@ -37,13 +37,20 @@
 #include <ip_addr.h>
 
 #include "FreeRTOS.h"
+#include "portable.h"
+#include "queue.h"
 #include "task.h"
+#include "timers.h"
 
 #include <rmw_microxrcedds_c/config.h>
+
+#include "app_x-cube-mems1.h"
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticQueue_t osStaticMessageQDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -62,8 +69,9 @@ ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 ADC_HandleTypeDef hadc3;
 
-I2C_HandleTypeDef hi2c1;
-I2C_HandleTypeDef hi2c2;
+CRC_HandleTypeDef hcrc;
+
+RTC_HandleTypeDef hrtc;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
@@ -75,14 +83,41 @@ UART_HandleTypeDef huart6;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
-/* Definitions for TaskInit */
-osThreadId_t TaskInitHandle;
-const osThreadAttr_t TaskInit_attributes = {
-  .name = "TaskInit",
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 1500
 };
+/* Definitions for SensorTask */
+osThreadId_t SensorTaskHandle;
+const osThreadAttr_t SensorTask_attributes = {
+  .name = "SensorTask",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 1500
+};
+/* Definitions for sensorQueue */
+osMessageQueueId_t sensorQueueHandle;
+uint8_t sensorQueueBuffer[ 16 * sizeof( pcc ) ];
+osStaticMessageQDef_t sensorQueueControlBlock;
+const osMessageQueueAttr_t sensorQueue_attributes = {
+  .name = "sensorQueue",
+  .cb_mem = &sensorQueueControlBlock,
+  .cb_size = sizeof(sensorQueueControlBlock),
+  .mq_mem = &sensorQueueBuffer,
+  .mq_size = sizeof(sensorQueueBuffer)
+};
+/* Definitions for myBinarySem01 */
+osSemaphoreId_t myBinarySem01Handle;
+const osSemaphoreAttr_t myBinarySem01_attributes = {
+  .name = "myBinarySem01"
+};
 /* USER CODE BEGIN PV */
+uint8_t SensorReadRequest = 0;
+struct pcc PCC_1;
+QueueHandle_t PCC_Queue_Handle = 0;
+// Structure for passing data from sensor task to mirco-ROS task via a queue.
 
 /* USER CODE END PV */
 
@@ -99,9 +134,10 @@ static void MX_TIM8_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_ADC3_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_I2C2_Init(void);
-void TaskInitFunction(void *argument);
+static void MX_CRC_Init(void);
+static void MX_RTC_Init(void);
+void StartDefaultTask(void *argument);
+void StartSensorTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 #define BUFSIZE 4096
@@ -109,7 +145,7 @@ char buffer[BUFSIZE];
 extern struct netif gnetif;
 UART_HandleTypeDef * printf_uart = NULL;
 // extern appMain;
-
+extern QueueHandle_t PCC_Queue_Handle;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -174,11 +210,11 @@ int main(void)
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_ADC3_Init();
-  MX_I2C1_Init();
-  MX_I2C2_Init();
+  MX_CRC_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-
-#ifdef RMW_UXRCE_TRANSPORT_UDP
+  MX_MEMS_Init();
+#ifdef MICRO_XRCEDDS_UDP
   printf_uart = &huart1;
 #elif defined(RMW_UXRCE_TRANSPORT_CUSTOM_SERIAL)
   if (!strcmp("3",RMW_UXRCE_DEFAULT_SERIAL_DEVICE)){
@@ -188,6 +224,7 @@ int main(void)
   }
 #endif
 
+  PCC_Queue_Handle = xQueueCreate(3,sizeof(PCC_1));
   /* USER CODE END 2 */
   /* Init scheduler */
   osKernelInitialize();
@@ -195,6 +232,10 @@ int main(void)
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of myBinarySem01 */
+  myBinarySem01Handle = osSemaphoreNew(1, 1, &myBinarySem01_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -204,13 +245,20 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of sensorQueue */
+  sensorQueueHandle = osMessageQueueNew (16, sizeof(pcc), &sensorQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of TaskInit */
-  TaskInitHandle = osThreadNew(TaskInitFunction, NULL, &TaskInit_attributes);
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of SensorTask */
+  SensorTaskHandle = osThreadNew(StartSensorTask, NULL, &SensorTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -240,6 +288,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage 
   */
@@ -247,9 +296,10 @@ void SystemClock_Config(void)
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
   /** Initializes the CPU, AHB and APB busses clocks 
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
@@ -276,6 +326,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
@@ -432,94 +488,62 @@ static void MX_ADC3_Init(void)
 }
 
 /**
-  * @brief I2C1 Initialization Function
+  * @brief CRC Initialization Function
   * @param None
   * @retval None
   */
-static void MX_I2C1_Init(void)
+static void MX_CRC_Init(void)
 {
 
-  /* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN CRC_Init 0 */
 
-  /* USER CODE END I2C1_Init 0 */
+  /* USER CODE END CRC_Init 0 */
 
-  /* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN CRC_Init 1 */
 
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
   {
     Error_Handler();
   }
-  /** Configure Analogue filter 
-  */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Digital filter 
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE BEGIN CRC_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+  /* USER CODE END CRC_Init 2 */
 
 }
 
 /**
-  * @brief I2C2 Initialization Function
+  * @brief RTC Initialization Function
   * @param None
   * @retval None
   */
-static void MX_I2C2_Init(void)
+static void MX_RTC_Init(void)
 {
 
-  /* USER CODE BEGIN I2C2_Init 0 */
+  /* USER CODE BEGIN RTC_Init 0 */
 
-  /* USER CODE END I2C2_Init 0 */
+  /* USER CODE END RTC_Init 0 */
 
-  /* USER CODE BEGIN I2C2_Init 1 */
+  /* USER CODE BEGIN RTC_Init 1 */
 
-  /* USER CODE END I2C2_Init 1 */
-  hi2c2.Instance = I2C2;
-  hi2c2.Init.ClockSpeed = 100000;
-  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c2.Init.OwnAddress1 = 0;
-  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.OwnAddress2 = 0;
-  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Analogue filter 
+  /* USER CODE END RTC_Init 1 */
+  /** Initialize RTC Only 
   */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
   {
     Error_Handler();
   }
-  /** Configure Digital filter 
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C2_Init 2 */
+  /* USER CODE BEGIN RTC_Init 2 */
 
-  /* USER CODE END I2C2_Init 2 */
+  /* USER CODE END RTC_Init 2 */
 
 }
 
@@ -829,7 +853,6 @@ static void MX_GPIO_Init(void)
 {
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -842,14 +865,14 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_TaskInitFunction */
+/* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the TaskInit thread.
+  * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used 
   * @retval None
   */
-/* USER CODE END Header_TaskInitFunction */
-void TaskInitFunction(void *argument)
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
 
@@ -926,6 +949,25 @@ void TaskInitFunction(void *argument)
   
 
   /* USER CODE END 5 */ 
+}
+
+/* USER CODE BEGIN Header_StartSensorTask */
+/**
+* @brief Function implementing the SensorTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSensorTask */
+void StartSensorTask(void *argument)
+{
+  /* USER CODE BEGIN StartSensorTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(200);
+	MX_MEMS_Process();
+  }
+  /* USER CODE END StartSensorTask */
 }
 
 /**

@@ -37,7 +37,6 @@
 
 /* Defines ------------------------------------------------------------------*/
 /* STMicroelectronics.X-CUBE-MEMS1.7.2.0 */
-#define LSM6DSL_ACCGYR_I2C
-#define LSM303AGR_ACCMAG_I2C 
+#define IKS01A2 
  
 #endif /* __RTE_COMPONENTS_H__ */
