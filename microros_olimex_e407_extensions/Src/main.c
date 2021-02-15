@@ -33,6 +33,9 @@
 #include <uxr/client/client.h>
 #include <ucdr/microcdr.h>
 
+#include <rmw_uros/options.h>
+#include <microros_transports.h>
+
 #include <sys/socket.h>
 #include <ip_addr.h>
 
@@ -153,12 +156,17 @@ int main(void)
 
 #ifdef RMW_UXRCE_TRANSPORT_UDP
   printf_uart = &huart3;
+<<<<<<< HEAD
 #elif defined(RMW_UXRCE_TRANSPORT_CUSTOM_SERIAL)
   if (!strcmp("3",RMW_UXRCE_DEFAULT_SERIAL_DEVICE)){
     printf_uart = &huart6;
   }else{
     printf_uart = &huart3;
   }
+=======
+#elif defined(RMW_UXRCE_TRANSPORT_CUSTOM)
+  printf_uart = &huart6;
+>>>>>>> 74cd38c0a283e66741881d62b5f0967640927179
 #endif
 
   /* USER CODE END 2 */
@@ -420,8 +428,20 @@ void initTaskFunction(void *argument)
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
   bool availableNetwork = false;
 
+<<<<<<< HEAD
 #ifdef RMW_UXRCE_TRANSPORT_CUSTOM_SERIAL
   availableNetwork = true;
+=======
+#ifdef RMW_UXRCE_TRANSPORT_CUSTOM
+  availableNetwork = true;
+  rmw_uros_set_custom_transport(
+    true,
+    (void *) &huart3,
+    freertos_serial_open,
+    freertos_serial_close,
+    freertos_serial_write,
+    freertos_serial_read);
+>>>>>>> 74cd38c0a283e66741881d62b5f0967640927179
 #elif defined(RMW_UXRCE_TRANSPORT_UDP)
   printf("Ethernet Initialization\r\n");
 
