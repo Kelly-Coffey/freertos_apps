@@ -46,10 +46,15 @@ struct pcc {
 		float gyroDataX;
 		float gyroDataY;
 	 	float gyroDataZ;
+		float magDataX;
+		float magDataY;
+	 	float magDataZ;
+	 	float tempData;
+	 	float presData;
+	 	float humdData;
  }pcc;
 
  extern struct pcc PCC_1;
-
 
 /* USER CODE END ET */
 

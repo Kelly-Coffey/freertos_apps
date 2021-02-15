@@ -5,7 +5,7 @@
   *                      of the STMicroelectronics.X-CUBE-MEMS1.7.2.0 instances.
   ******************************************************************************
   *
-  * COPYRIGHT 2020 STMicroelectronics
+  * COPYRIGHT 2021 STMicroelectronics
   *
   * Licensed under MCD-ST Liberty SW License Agreement V2, (the "License");
   * You may not use this file except in compliance with the License.
@@ -32,21 +32,6 @@
 /* Includes ------------------------------------------------------------------*/
 
 /* Exported defines ----------------------------------------------------------*/
- //------------------------------------------------------------------------------
- // Definitions
-
- /**
-  * @brief Three-dimensional spacial vector.
-  */
- typedef union {
-     float array[3];
-
-     struct {
-         float x;
-         float y;
-         float z;
-     } axis;
- } FusionVector3;
 
 /* Exported functions --------------------------------------------------------*/
 void MX_MEMS_Init(void);
