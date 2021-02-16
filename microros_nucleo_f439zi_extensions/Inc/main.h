@@ -56,6 +56,14 @@ struct pcc {
 
  extern struct pcc PCC_1;
 
+ struct motorctrl {
+ 		int power;
+ 		int direction;
+ }motorctrl;
+
+ extern struct motorctrl MOTORCTRL_1;
+
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -78,6 +86,10 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define HB0_P_EN_Pin GPIO_PIN_0
+#define HB0_P_EN_GPIO_Port GPIOE
+#define HB0_N_EN_Pin GPIO_PIN_1
+#define HB0_N_EN_GPIO_Port GPIOE
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

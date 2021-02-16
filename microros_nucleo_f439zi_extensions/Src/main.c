@@ -45,6 +45,7 @@
 #include <rmw_microxrcedds_c/config.h>
 
 #include "app_x-cube-mems1.h"
+#include "app_btn8962ta_motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -81,15 +82,22 @@ DMA_HandleTypeDef hdma_usart2_tx;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityAboveNormal,
   .stack_size = 1500
 };
 /* Definitions for SensorTask */
 osThreadId_t SensorTaskHandle;
 const osThreadAttr_t SensorTask_attributes = {
   .name = "SensorTask",
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 3000
+};
+/* Definitions for MechTask */
+osThreadId_t MechTaskHandle;
+const osThreadAttr_t MechTask_attributes = {
+  .name = "MechTask",
+  .priority = (osPriority_t) osPriorityBelowNormal,
+  .stack_size = 128
 };
 /* Definitions for sensorQueue */
 osMessageQueueId_t sensorQueueHandle;
@@ -101,6 +109,28 @@ const osMessageQueueAttr_t sensorQueue_attributes = {
   .cb_size = sizeof(sensorQueueControlBlock),
   .mq_mem = &sensorQueueBuffer,
   .mq_size = sizeof(sensorQueueBuffer)
+};
+/* Definitions for motorctrlQueue */
+osMessageQueueId_t motorctrlQueueHandle;
+uint8_t motorCtrlQueueBuffer[ 2 * sizeof( motorctrl ) ];
+osStaticMessageQDef_t motorCtrlQueueControlBlock;
+const osMessageQueueAttr_t motorctrlQueue_attributes = {
+  .name = "motorctrlQueue",
+  .cb_mem = &motorCtrlQueueControlBlock,
+  .cb_size = sizeof(motorCtrlQueueControlBlock),
+  .mq_mem = &motorCtrlQueueBuffer,
+  .mq_size = sizeof(motorCtrlQueueBuffer)
+};
+/* Definitions for encoderQueue */
+osMessageQueueId_t encoderQueueHandle;
+uint8_t encoderQueueBuffer[ 2 * sizeof( uint16_t ) ];
+osStaticMessageQDef_t encoderQueueControlBlock;
+const osMessageQueueAttr_t encoderQueue_attributes = {
+  .name = "encoderQueue",
+  .cb_mem = &encoderQueueControlBlock,
+  .cb_size = sizeof(encoderQueueControlBlock),
+  .mq_mem = &encoderQueueBuffer,
+  .mq_size = sizeof(encoderQueueBuffer)
 };
 /* USER CODE BEGIN PV */
 uint8_t SensorReadRequest = 0;
@@ -123,6 +153,7 @@ static void MX_ADC2_Init(void);
 static void MX_ADC3_Init(void);
 void StartDefaultTask(void *argument);
 void StartSensorTask(void *argument);
+void StartMechTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 #define BUFSIZE 4096
@@ -208,6 +239,7 @@ int main(void)
 #endif
 
 	MX_MEMS_Init();
+	MX_MOTOR_Init();
 	PCC_Queue_Handle = xQueueCreate(3,sizeof(PCC_1));
   /* USER CODE END 2 */
   /* Init scheduler */
@@ -229,6 +261,12 @@ int main(void)
   /* creation of sensorQueue */
   sensorQueueHandle = osMessageQueueNew (16, sizeof(pcc), &sensorQueue_attributes);
 
+  /* creation of motorctrlQueue */
+  motorctrlQueueHandle = osMessageQueueNew (2, sizeof(motorctrl), &motorctrlQueue_attributes);
+
+  /* creation of encoderQueue */
+  encoderQueueHandle = osMessageQueueNew (2, sizeof(uint16_t), &encoderQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -239,6 +277,9 @@ int main(void)
 
   /* creation of SensorTask */
   SensorTaskHandle = osThreadNew(StartSensorTask, NULL, &SensorTask_attributes);
+
+  /* creation of MechTask */
+  MechTaskHandle = osThreadNew(StartMechTask, NULL, &MechTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -251,6 +292,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+
   while (1)
   {
     /* USER CODE END WHILE */
@@ -479,12 +522,12 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
+  htim1.Init.Prescaler = 9;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 0;
+  htim1.Init.Period = 1000;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
@@ -496,7 +539,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 500;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -763,6 +806,7 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -771,6 +815,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, HB0_P_EN_Pin|HB0_N_EN_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : HB0_P_EN_Pin HB0_N_EN_Pin */
+  GPIO_InitStruct.Pin = HB0_P_EN_Pin|HB0_N_EN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
 }
 
@@ -881,6 +935,27 @@ void StartSensorTask(void *argument)
   	  }
   }
   /* USER CODE END StartSensorTask */
+}
+
+/* USER CODE BEGIN Header_StartMechTask */
+/**
+* @brief Function implementing the MechTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartMechTask */
+void StartMechTask(void *argument)
+{
+  /* USER CODE BEGIN StartMechTask */
+  /* Infinite loop */
+  for(;;)
+  {  while (1){
+	  MX_MOTOR_Process();
+	  osDelay(100);
+  	  }
+    osDelay(1);
+  }
+  /* USER CODE END StartMechTask */
 }
 
 /**
