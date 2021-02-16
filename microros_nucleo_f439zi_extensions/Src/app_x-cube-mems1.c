@@ -46,7 +46,7 @@ static IKS01A2_MOTION_SENSOR_Capabilities_t MotionCapabilities[IKS01A2_MOTION_IN
 static IKS01A2_ENV_SENSOR_Capabilities_t EnvCapabilities[IKS01A2_ENV_INSTANCES_NBR];
 
 struct pcc PCC_1;
-QueueHandle_t PCC_Queue_Handle;
+extern QueueHandle_t sensorQueueHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 static void Accelero_Sensor_Handler(uint32_t Instance);
@@ -206,7 +206,7 @@ void MX_IKS01A2_Process(void)
       Press_Sensor_Handler(i);
     }
   }
-  if (! xQueueSend(PCC_Queue_Handle,&PCC_1,100)){
+  if (! xQueueSend(sensorQueueHandle,&PCC_1,100)){
 	  printf("Failed to write sensor data to PCC queue\n");
 	}
 

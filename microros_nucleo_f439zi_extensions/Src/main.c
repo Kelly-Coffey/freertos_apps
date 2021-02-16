@@ -105,7 +105,7 @@ const osMessageQueueAttr_t sensorQueue_attributes = {
 /* USER CODE BEGIN PV */
 uint8_t SensorReadRequest = 0;
 struct pcc PCC_1;
-QueueHandle_t PCC_Queue_Handle = 0;
+QueueHandle_t sensorQueueHandle = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -130,7 +130,7 @@ char buffer[BUFSIZE];
 extern struct netif gnetif;
 UART_HandleTypeDef * printf_uart = NULL;
 // extern appMain;
-extern QueueHandle_t PCC_Queue_Handle;
+//extern QueueHandle_t sensorQueueHandle;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -208,7 +208,6 @@ int main(void)
 #endif
 
 	MX_MEMS_Init();
-	PCC_Queue_Handle = xQueueCreate(3,sizeof(PCC_1));
   /* USER CODE END 2 */
   /* Init scheduler */
   osKernelInitialize();
