@@ -97,11 +97,11 @@ osThreadId_t MechTaskHandle;
 const osThreadAttr_t MechTask_attributes = {
   .name = "MechTask",
   .priority = (osPriority_t) osPriorityBelowNormal,
-  .stack_size = 128
+  .stack_size = 1500
 };
 /* Definitions for sensorQueue */
 osMessageQueueId_t sensorQueueHandle;
-uint8_t sensorQueueBuffer[ 16 * sizeof( pcc ) ];
+uint8_t sensorQueueBuffer[ 3 * sizeof( pcc ) ];
 osStaticMessageQDef_t sensorQueueControlBlock;
 const osMessageQueueAttr_t sensorQueue_attributes = {
   .name = "sensorQueue",
@@ -112,7 +112,7 @@ const osMessageQueueAttr_t sensorQueue_attributes = {
 };
 /* Definitions for motorctrlQueue */
 osMessageQueueId_t motorctrlQueueHandle;
-uint8_t motorCtrlQueueBuffer[ 2 * sizeof( motorctrl ) ];
+uint8_t motorCtrlQueueBuffer[ 3 * sizeof( motorctrl ) ];
 osStaticMessageQDef_t motorCtrlQueueControlBlock;
 const osMessageQueueAttr_t motorctrlQueue_attributes = {
   .name = "motorctrlQueue",
@@ -123,7 +123,7 @@ const osMessageQueueAttr_t motorctrlQueue_attributes = {
 };
 /* Definitions for encoderQueue */
 osMessageQueueId_t encoderQueueHandle;
-uint8_t encoderQueueBuffer[ 2 * sizeof( uint16_t ) ];
+uint8_t encoderQueueBuffer[ 3 * sizeof( encoder ) ];
 osStaticMessageQDef_t encoderQueueControlBlock;
 const osMessageQueueAttr_t encoderQueue_attributes = {
   .name = "encoderQueue",
@@ -135,7 +135,11 @@ const osMessageQueueAttr_t encoderQueue_attributes = {
 /* USER CODE BEGIN PV */
 uint8_t SensorReadRequest = 0;
 struct pcc PCC_1;
+struct motorctrl MOTORCTRL_1;
+struct encoder ENCODER_1;
 QueueHandle_t sensorQueueHandle = 0;
+QueueHandle_t motorctrlQueueHandle = 0;
+QueueHandle_t encoderQueueHandle = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -160,8 +164,7 @@ void StartMechTask(void *argument);
 char buffer[BUFSIZE];
 extern struct netif gnetif;
 UART_HandleTypeDef * printf_uart = NULL;
-// extern appMain;
-//extern QueueHandle_t sensorQueueHandle;
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -239,11 +242,8 @@ int main(void)
 #endif
 
 	MX_MEMS_Init();
-<<<<<<< HEAD
 	MX_MOTOR_Init();
-	PCC_Queue_Handle = xQueueCreate(3,sizeof(PCC_1));
-=======
->>>>>>> foxy
+//	PCC_Queue_Handle = xQueueCreate(3,sizeof(PCC_1));
   /* USER CODE END 2 */
   /* Init scheduler */
   osKernelInitialize();
@@ -262,13 +262,13 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of sensorQueue */
-  sensorQueueHandle = osMessageQueueNew (16, sizeof(pcc), &sensorQueue_attributes);
+  sensorQueueHandle = osMessageQueueNew (3, sizeof(pcc), &sensorQueue_attributes);
 
   /* creation of motorctrlQueue */
-  motorctrlQueueHandle = osMessageQueueNew (2, sizeof(motorctrl), &motorctrlQueue_attributes);
+  motorctrlQueueHandle = osMessageQueueNew (3, sizeof(motorctrl), &motorctrlQueue_attributes);
 
   /* creation of encoderQueue */
-  encoderQueueHandle = osMessageQueueNew (2, sizeof(uint16_t), &encoderQueue_attributes);
+  encoderQueueHandle = osMessageQueueNew (3, sizeof(encoder), &encoderQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */

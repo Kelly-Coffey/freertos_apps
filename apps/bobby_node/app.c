@@ -30,6 +30,7 @@
 #define STRING_BUFFER_LEN 100
 //#define STRING_BUFFER_LEN 50
 extern QueueHandle_t sensorQueueHandle;
+extern QueueHandle_t encoderQueueHandle;
 // Bobby Code End //
 
 
@@ -92,6 +93,28 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
 						rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
 				}
+
+		if(xQueueReceive(encoderQueueHandle, &ENCODER_1, 90)){
+						// Publish IMU
+						//imu_data.x = PCC_1.accelDataX;
+						//imu_data.y = PCC_1.accelDataY;
+						//imu_data.z = PCC_1.accelDataZ;
+						imu_data.x = ENCODER_1.position; // degrees in radians
+						imu_data.y = ENCODER_1.radspsec; //radians per second
+						//imu_data.angular.z = ENCODER_1.target;
+
+						//imu_data.linear.x = PCC_1.accelDataX;
+					    //imu_data.linear.y = PCC_1.accelDataY;
+						//imu_data.linear.z = PCC_1.accelDataZ;
+						//imu_data.angular.x = PCC_1.gyroDataX;
+						//imu_data.angular.y = PCC_1.gyroDataY;
+						//imu_data.angular.z = PCC_1.gyroDataZ;
+						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
+						rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
+				}
+
+
+
 	}
 }
 

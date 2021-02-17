@@ -1,8 +1,8 @@
 /**
   ******************************************************************************
-  * File Name          : app_btn8962ta_motor.c
+  * File Name          : app_TIM3_encoder.c
   * Description        : This file provides code for the configuration
-  *                      of the STM32 Timer1 and BTN8962TA Half-Bridge or Full-Bridge
+  *                      of the STM32 Timer3 with Hall Effect sensor input
   ******************************************************************************
   *
   * COPYRIGHT 2021 Kelly-Coffey
@@ -21,7 +21,7 @@
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "app_btn8962ta_motor.h"
+#include "app_TIM3_encoder.h"
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
@@ -37,18 +37,21 @@
 /* Private variables ---------------------------------------------------------*/
 static uint8_t verbose = 1;  /* Verbose output to UART terminal ON/OFF. */
 
-struct motorctrl MOTORCTRL_1;
-QueueHandle_t motorctrlQueueHandle;
+struct encoder ENCODER_1;
+QueueHandle_t encoderQueueHandle;
+float previousPosition = 0;
+const maximumPosition = 4096
+
 
 
 /* Private function prototypes -----------------------------------------------*/
-static void MX_BTN8962TA_Init(void);
-static void MX_BTN8962TA_Process(void);
+static void MX_Encoder_Init(void);
+static void MX_Encoder_Process(void);
 
 /* External variables --------------------------------------------------------*/
-extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim3;
 
-void MX_MOTOR_Init(void)
+void MX_Encoder_Init(void)
 {
   /* USER CODE BEGIN SV */
 
@@ -60,7 +63,7 @@ void MX_MOTOR_Init(void)
 
   /* Initialize the peripherals and the MEMS components */
 
-  MX_BTN8962TA_Init();
+  MX_TIM3encoder_Init();
 
   /* USER CODE BEGIN MEMS_Init_PostTreatment */
 
@@ -70,13 +73,13 @@ void MX_MOTOR_Init(void)
 /*
  * LM background task
  */
-void MX_MOTOR_Process(void)
+void MX_Encoder_Process(void)
 {
   /* USER CODE BEGIN MEMS_Process_PreTreatment */
 
   /* USER CODE END MEMS_Process_PreTreatment */
 
-  MX_BTN8962TA_Process();
+  MX_TIM3encoder_Process();
 
   /* USER CODE BEGIN MEMS_Process_PostTreatment */
 
@@ -87,16 +90,10 @@ void MX_MOTOR_Process(void)
   * @brief  Initialize the DataLogTerminal application
   * @retval None
   */
-void MX_BTN8962TA_Init(void)
+void MX_TIM3encoder_Init(void)
 {
 
-	HAL_GPIO_WritePin(GPIOE,HB0_P_EN_Pin,GPIO_PIN_RESET);   // BOTH MOTOR DIRECTIONS ARE DISABLED
-	HAL_GPIO_WritePin(GPIOE,HB0_N_EN_Pin,GPIO_PIN_RESET);
-
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1); // turn on complementary channel
-
-	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,500); // Set motor power 50% as default
+	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
 
 }
 
@@ -105,36 +102,19 @@ void MX_BTN8962TA_Init(void)
   * @brief  Process of the DataLogTerminal application
   * @retval None
   */
-void MX_BTN8962TA_Process(void)
+void MX_TIM3encoder_Process(void)
 {
-	const int STOP = 0;
-	const int FORWARD = 1;
-	const int BACKWARD = 2;
-	const int MaxMagnitude = 1000;
-	int magnitude;
+	float currentPosition;
+	const float radspertick = maximumPosition/(2*3.14759);
 
-	if(xQueueReceive(motorctrlQueueHandle, &MOTORCTRL_1, 90)){
+	currentPosition = (float) TIM3->CNT;
 
-		switch ((int)MOTORCTRL_1.direction){
-			case 1:
-				magnitude = MOTORCTRL_1.power;              // direct due to P complementary PWN output
-				HAL_GPIO_WritePin(GPIOE,HB0_P_EN_Pin,GPIO_PIN_SET);   // MOTOR DIRECTIONS FORWARDS
-				HAL_GPIO_WritePin(GPIOE,HB0_N_EN_Pin,GPIO_PIN_RESET);
-				__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,magnitude); // set PWM_P motor power
-				break;
+	ENCODER_1.position = (previousPosition - currentPosition)*radspertick;
 
-			case 2:
-				magnitude = 1000 - MOTORCTRL_1.power;		// inverse due to N complementary PWN output
-				HAL_GPIO_WritePin(GPIOE,HB0_P_EN_Pin,GPIO_PIN_RESET);   // MOTOR DIRECTIONS BACKWARDS
-				HAL_GPIO_WritePin(GPIOE,HB0_N_EN_Pin,GPIO_PIN_SET);
-				__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1,(MaxMagnitude-magnitude)); // set PWM_N motor power
-				break;
-
-			default:
-				HAL_GPIO_WritePin(GPIOE,HB0_P_EN_Pin,GPIO_PIN_RESET);   // BOTH MOTOR DISABLED
-				HAL_GPIO_WritePin(GPIOE,HB0_N_EN_Pin,GPIO_PIN_RESET);
+	ENCODER_1.radspsec  = ((previousPosition - currentPosition)*radspertick/0.100) ;
+	  if (! xQueueSend(encoderQueueHandle,&ENCODER_1,100)){
+		  printf("Failed to write sensor data to QueueHandle\n");
 		}
-	}
 }
 
 #ifdef __cplusplus

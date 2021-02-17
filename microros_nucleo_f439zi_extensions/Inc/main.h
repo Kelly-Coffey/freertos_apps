@@ -52,17 +52,24 @@ struct pcc {
 	 	float tempData;
 	 	float presData;
 	 	float humdData;
- }pcc;
+} pcc;
 
- extern struct pcc PCC_1;
+extern struct pcc PCC_1;
 
- struct motorctrl {
- 		int power;
- 		int direction;
- }motorctrl;
+struct motorctrl {
+	 float power;  // 0 to 1000
+	 float direction; // stop, forward , backward
+	 float target  // in degrees radians TODO need to determine best 0 degree relative to hardware
+} motorctrl;
 
- extern struct motorctrl MOTORCTRL_1;
+extern struct motorctrl MOTORCTRL_1;
 
+struct encoder {
+	 float position;  // degrees in radians
+	 float radspsec;  //radians per second
+} encoder;
+
+extern struct encoder ENCODER_1;
 
 /* USER CODE END ET */
 
