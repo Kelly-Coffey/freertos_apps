@@ -29,7 +29,7 @@
 #include <sensor_msgs/msg/imu.h>
 #define STRING_BUFFER_LEN 100
 //#define STRING_BUFFER_LEN 50
-xQueueHandle PCC_Queue_Handle;
+extern QueueHandle_t sensorQueueHandle;
 // Bobby Code End //
 
 
@@ -76,7 +76,7 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 		printf("Ping send seq %s\n", outcoming_ping.frame_id.data);
 
 
-		if(xQueueReceive(PCC_Queue_Handle, &PCC_1, 90)){
+		if(xQueueReceive(sensorQueueHandle, &PCC_1, 90)){
 						// Publish IMU
 						imu_data.x = PCC_1.accelDataX;
 						imu_data.y = PCC_1.accelDataY;
