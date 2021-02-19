@@ -40,12 +40,14 @@
 #include "task.h"
 #include "timers.h"
 
+#include <sensfusion9.h>
+
 /* Private variables ---------------------------------------------------------*/
 static uint8_t verbose = 1;  /* Verbose output to UART terminal ON/OFF. */
 static IKS01A2_MOTION_SENSOR_Capabilities_t MotionCapabilities[IKS01A2_MOTION_INSTANCES_NBR];
 static IKS01A2_ENV_SENSOR_Capabilities_t EnvCapabilities[IKS01A2_ENV_INSTANCES_NBR];
 
-struct pcc PCC_1;
+struct sensor SENSOR_1;
 extern QueueHandle_t sensorQueueHandle;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,6 +59,38 @@ static void Hum_Sensor_Handler(uint32_t Instance);
 static void Press_Sensor_Handler(uint32_t Instance);
 static void MX_IKS01A2_Init(void);
 static void MX_IKS01A2_Process(void);
+
+
+/**
+ * @brief Representation of a sensor readout value.
+ *
+ * The value is represented as having an integer and a fractional part,
+ * and can be obtained using the formula val1 + val2 * 10^(-6). Negative
+ * values also adhere to the above formula, but may need special attention.
+ * Here are some examples of the value representation:
+ *
+ *      0.5: val1 =  0, val2 =  500000
+ *     -0.5: val1 =  0, val2 = -500000
+ *     -1.0: val1 = -1, val2 =  0
+ *     -1.5: val1 = -1, val2 = -500000
+ */
+struct sensor_value {
+	/** Integer part of the value. */
+	int32_t val1;
+	/** Fractional part of the value (in one-millionth parts). */
+	int32_t val2;
+};
+
+/**
+ * @brief Helper function for converting struct sensor_value to double.
+ *
+ * @param val A pointer to a sensor_value struct.
+ * @return The converted value.
+ */
+static inline double sensor_value_to_double(struct sensor_value *val)
+{
+	return (double)val->val1 + (double)val->val2 / 1000000;
+}
 
 void MX_MEMS_Init(void)
 {
@@ -164,6 +198,9 @@ void MX_IKS01A2_Init(void)
     printf("%s", dataOut);
   } */
 
+  //Intialize matrixes for math
+  sensfusion9Init();
+
 }
 
 
@@ -206,7 +243,39 @@ void MX_IKS01A2_Process(void)
       Press_Sensor_Handler(i);
     }
   }
-  if (! xQueueSend(sensorQueueHandle,&PCC_1,100)){
+
+  float sample_rate = 0.3;
+  // Calibration values for ST disco obtained using: https://learn.adafruit.com/adafruit-sensorlab-magnetometer-calibration/magnetic-calibration-with-jupyter
+  float mag_calibration[3] = {0.335, -0.150, -0.105};
+  float gyro_calibration[3] = {-0.0, -0.02, 0.01};
+
+  sensfusion9Update((float)(sensor_value_to_double(&SENSOR_1.gyroDataX) - gyro_calibration[0]),
+					(float)(sensor_value_to_double(&SENSOR_1.gyroDataY) - gyro_calibration[1]),
+					(float)(sensor_value_to_double(&SENSOR_1.gyroDataZ) - gyro_calibration[2]),
+					(float) sensor_value_to_double(&SENSOR_1.accelDataX),
+					(float) sensor_value_to_double(&SENSOR_1.accelDataY),
+					(float) sensor_value_to_double(&SENSOR_1.accelDataZ),
+					(float) (-sensor_value_to_double(&SENSOR_1.magDataX) - mag_calibration[0]),
+					(float) (-sensor_value_to_double(&SENSOR_1.magDataY) - mag_calibration[1]),
+					(float) ( sensor_value_to_double(&SENSOR_1.magDataZ) - mag_calibration[2]),
+					sample_rate);
+
+  float q[4];
+  sensfusion9GetQuaternion(q);
+
+  SENSOR_1.x = (double) q[1];
+  SENSOR_1.y = (double) q[2];
+  SENSOR_1.z = (double) q[3];
+  SENSOR_1.w = (double) q[0];
+
+  float angles[3];
+  sensfusion9GetEulerRPY(angles);
+
+  SENSOR_1.angle_x = angles[0];
+  SENSOR_1.angle_x = angles[1];
+  SENSOR_1.angle_x = angles[2];
+
+  if (! xQueueSend(sensorQueueHandle,&SENSOR_1,100)){
 	  printf("Failed to write sensor data to PCC queue\n");
 	}
 
@@ -226,15 +295,15 @@ static void Accelero_Sensor_Handler(uint32_t Instance)
 
   if (IKS01A2_MOTION_SENSOR_GetAxes(Instance, MOTION_ACCELERO, &acceleration))
   {
-	PCC_1.accelDataX =0;
-	PCC_1.accelDataY =0;
-	PCC_1.accelDataZ =0;
+	SENSOR_1.accelDataX =0;
+	SENSOR_1.accelDataY =0;
+	SENSOR_1.accelDataZ =0;
   }
   else
   {
-    PCC_1.accelDataX =(int)acceleration.x;
-    PCC_1.accelDataY =(int)acceleration.y;
-    PCC_1.accelDataZ =(int)acceleration.z;
+    SENSOR_1.accelDataX =(int)acceleration.x;
+    SENSOR_1.accelDataY =(int)acceleration.y;
+    SENSOR_1.accelDataZ =(int)acceleration.z;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability
@@ -292,15 +361,15 @@ static void Gyro_Sensor_Handler(uint32_t Instance)
 
   if (IKS01A2_MOTION_SENSOR_GetAxes(Instance, MOTION_GYRO, &angular_velocity))
   {
-	    PCC_1.gyroDataX =0;
-	    PCC_1.gyroDataY =0;
-	    PCC_1.gyroDataZ =0;
+	    SENSOR_1.gyroDataX =0;
+	    SENSOR_1.gyroDataY =0;
+	    SENSOR_1.gyroDataZ =0;
   }
   else
   {
-	    PCC_1.gyroDataX =(int)angular_velocity.x;
-	    PCC_1.gyroDataY =(int)angular_velocity.y;
-	    PCC_1.gyroDataZ =(int)angular_velocity.z;
+	    SENSOR_1.gyroDataX =(int)angular_velocity.x;
+	    SENSOR_1.gyroDataY =(int)angular_velocity.y;
+	    SENSOR_1.gyroDataZ =(int)angular_velocity.z;
   }
 
 
@@ -359,15 +428,15 @@ static void Magneto_Sensor_Handler(uint32_t Instance)
 
   if (IKS01A2_MOTION_SENSOR_GetAxes(Instance, MOTION_MAGNETO, &magnetic_field))
   {
-	    PCC_1.magDataX =0;
-	    PCC_1.magDataY =0;
-	    PCC_1.magDataZ =0;
+	    SENSOR_1.magDataX =0;
+	    SENSOR_1.magDataY =0;
+	    SENSOR_1.magDataZ =0;
   }
   else
   {
-	    PCC_1.magDataX =(int)magnetic_field.x;
-	    PCC_1.magDataY =(int)magnetic_field.y;
-	    PCC_1.magDataZ =(int)magnetic_field.z;
+	    SENSOR_1.magDataX =(int)magnetic_field.x;
+	    SENSOR_1.magDataY =(int)magnetic_field.y;
+	    SENSOR_1.magDataZ =(int)magnetic_field.z;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability
@@ -424,11 +493,11 @@ static void Temp_Sensor_Handler(uint32_t Instance)
 
   if (IKS01A2_ENV_SENSOR_GetValue(Instance, ENV_TEMPERATURE, &temperature))
   {
-	  PCC_1.tempData=0;
+	  SENSOR_1.tempData=0;
   }
   else
   {
-	  PCC_1.tempData=temperature;
+	  SENSOR_1.tempData=temperature;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability
@@ -475,11 +544,11 @@ static void Press_Sensor_Handler(uint32_t Instance)
 
   if (IKS01A2_ENV_SENSOR_GetValue(Instance, ENV_PRESSURE, &pressure))
   {
-	  PCC_1.presData=0;
+	  SENSOR_1.presData=0;
   }
   else
   {
-	  PCC_1.presData=pressure;
+	  SENSOR_1.presData=pressure;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability
@@ -526,11 +595,11 @@ static void Hum_Sensor_Handler(uint32_t Instance)
 
   if (IKS01A2_ENV_SENSOR_GetValue(Instance, ENV_HUMIDITY, &humidity))
   {
-	  PCC_1.humdData=0;
+	  SENSOR_1.humdData=0;
   }
   else
   {
-	  PCC_1.humdData=humidity;
+	  SENSOR_1.humdData=humidity;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability
@@ -563,6 +632,8 @@ static void Hum_Sensor_Handler(uint32_t Instance)
   } */
 
 }
+
+
 
 #ifdef __cplusplus
 }

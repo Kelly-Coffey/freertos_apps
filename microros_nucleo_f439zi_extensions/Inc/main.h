@@ -39,7 +39,7 @@ extern "C" {
 /* USER CODE BEGIN ET */
 extern uint8_t SensorReadRequest;
 
-struct pcc {
+struct sensor {
 		float accelDataX;
 		float accelDataY;
 	 	float accelDataZ;
@@ -52,9 +52,17 @@ struct pcc {
 	 	float tempData;
 	 	float presData;
 	 	float humdData;
- }pcc;
+	 	double x;
+	 	double y;
+	 	double z;
+	 	double w;
+	 	float angle_x;
+		float angle_y;
+		float angle_z;
+ }sensor;
 
- extern struct pcc PCC_1;
+ extern struct sensor SENSOR_1;
+
 
 /* USER CODE END ET */
 
