@@ -272,8 +272,8 @@ void MX_IKS01A2_Process(void)
   sensfusion9GetEulerRPY(angles);
 
   SENSOR_1.angle_x = angles[0];
-  SENSOR_1.angle_x = angles[1];
-  SENSOR_1.angle_x = angles[2];
+  SENSOR_1.angle_y = angles[1];
+  SENSOR_1.angle_z = angles[2];
 
   if (! xQueueSend(sensorQueueHandle,&SENSOR_1,100)){
 	  printf("Failed to write sensor data to PCC queue\n");

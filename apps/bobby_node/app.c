@@ -84,7 +84,7 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 
 
 		if(xQueueReceive(sensorQueueHandle, &SENSOR_1, 90)){
-						// Publish IMU
+					//  Publish IMU
 					//	imu_data.x = SENSOR_1.accelDataX;
 					//	imu_data.y = SENSOR_1.accelDataY;
 					//	imu_data.z = SENSOR_1.accelDataZ;
@@ -93,16 +93,13 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 						imu_data.y = SENSOR_1.angle_y;
 						imu_data.z = SENSOR_1.angle_z;
 
-
-
-
-						//imu_data.linear.x = SENSOR_1.accelDataX;
-					    //imu_data.linear.y = SENSOR_1.accelDataY;
-						//imu_data.linear.z = SENSOR_1.accelDataZ;
-						//imu_data.angular.x = SENSOR_1.gyroDataX;
-						//imu_data.angular.y = SENSOR_1.gyroDataY;
-						//imu_data.angular.z = SENSOR_1.gyroDataZ;
-						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
+					//	imu_data.linear.x = SENSOR_1.accelDataX;
+					//	imu_data.linear.y = SENSOR_1.accelDataY;
+					//	imu_data.linear.z = SENSOR_1.accelDataZ;
+					//	imu_data.angular.x = SENSOR_1.gyroDataX;
+					//	imu_data.angular.y = SENSOR_1.gyroDataY;
+					//	imu_data.angular.z = SENSOR_1.gyroDataZ;
+					//	printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
 						rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
 				}
 	}
