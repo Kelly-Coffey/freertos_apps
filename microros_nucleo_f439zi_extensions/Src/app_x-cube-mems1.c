@@ -50,6 +50,8 @@ static IKS01A2_ENV_SENSOR_Capabilities_t EnvCapabilities[IKS01A2_ENV_INSTANCES_N
 struct sensor SENSOR_1;
 extern QueueHandle_t sensorQueueHandle;
 
+float angles[3];
+
 /* Private function prototypes -----------------------------------------------*/
 static void Accelero_Sensor_Handler(uint32_t Instance);
 static void Gyro_Sensor_Handler(uint32_t Instance);
@@ -244,20 +246,39 @@ void MX_IKS01A2_Process(void)
     }
   }
 
-  float sample_rate = 0.3;
+  float sample_rate = 0.1;
   // Calibration values for ST disco obtained using: https://learn.adafruit.com/adafruit-sensorlab-magnetometer-calibration/magnetic-calibration-with-jupyter
-  float mag_calibration[3] = {0.335, -0.150, -0.105};
-  float gyro_calibration[3] = {-0.0, -0.02, 0.01};
+  float mag_calibration[3] = {0.0, 0.0, 0.0};
+  float gyro_calibration[3] = {0.0, 0.0, 0.0};
 
-  sensfusion9Update((float)(sensor_value_to_double(&SENSOR_1.gyroDataX) - gyro_calibration[0]),
-					(float)(sensor_value_to_double(&SENSOR_1.gyroDataY) - gyro_calibration[1]),
-					(float)(sensor_value_to_double(&SENSOR_1.gyroDataZ) - gyro_calibration[2]),
-					(float) sensor_value_to_double(&SENSOR_1.accelDataX),
-					(float) sensor_value_to_double(&SENSOR_1.accelDataY),
-					(float) sensor_value_to_double(&SENSOR_1.accelDataZ),
-					(float) (-sensor_value_to_double(&SENSOR_1.magDataX) - mag_calibration[0]),
-					(float) (-sensor_value_to_double(&SENSOR_1.magDataY) - mag_calibration[1]),
-					(float) ( sensor_value_to_double(&SENSOR_1.magDataZ) - mag_calibration[2]),
+  SENSOR_1.gyroDataX = SENSOR_1.gyroDataX - gyro_calibration[0];
+  SENSOR_1.gyroDataY = SENSOR_1.gyroDataY - gyro_calibration[1];
+  SENSOR_1.gyroDataZ = SENSOR_1.gyroDataZ - gyro_calibration[2];
+
+  SENSOR_1.magDataX	= SENSOR_1.magDataX - mag_calibration[0];
+  SENSOR_1.magDataY	= SENSOR_1.magDataY - mag_calibration[1];
+  SENSOR_1.magDataZ	= SENSOR_1.magDataZ - mag_calibration[2];
+
+
+  //SENSOR_1.accelDataX = 0;
+  //SENSOR_1.accelDataY = 0;
+  //SENSOR_1.accelDataZ = 1.0;
+
+  //SENSOR_1.gyroDataX = 0.0;
+  //SENSOR_1.gyroDataY = 0.0;
+  //SENSOR_1.gyroDataZ = 0.0;
+
+
+
+  sensfusion9Update(SENSOR_1.gyroDataX,
+					SENSOR_1.gyroDataY,
+					SENSOR_1.gyroDataZ,
+					SENSOR_1.accelDataX,
+					SENSOR_1.accelDataY,
+					SENSOR_1.accelDataZ,
+					SENSOR_1.magDataX,
+					SENSOR_1.magDataY,
+					SENSOR_1.magDataZ,
 					sample_rate);
 
   float q[4];
@@ -268,7 +289,7 @@ void MX_IKS01A2_Process(void)
   SENSOR_1.z = (double) q[3];
   SENSOR_1.w = (double) q[0];
 
-  float angles[3];
+
   sensfusion9GetEulerRPY(angles);
 
   SENSOR_1.angle_x = angles[0];
@@ -301,9 +322,9 @@ static void Accelero_Sensor_Handler(uint32_t Instance)
   }
   else
   {
-    SENSOR_1.accelDataX =(int)acceleration.x;
-    SENSOR_1.accelDataY =(int)acceleration.y;
-    SENSOR_1.accelDataZ =(int)acceleration.z;
+    SENSOR_1.accelDataX =(acceleration.x * 9.81)/1000; // Covert 2g FS from mg/lsb to m/s^2
+    SENSOR_1.accelDataY =(acceleration.y * 9.81)/1000;
+    SENSOR_1.accelDataZ =(acceleration.z * 9.81)/1000;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability
@@ -367,9 +388,12 @@ static void Gyro_Sensor_Handler(uint32_t Instance)
   }
   else
   {
-	    SENSOR_1.gyroDataX =(int)angular_velocity.x;
-	    SENSOR_1.gyroDataY =(int)angular_velocity.y;
-	    SENSOR_1.gyroDataZ =(int)angular_velocity.z;
+	//  SENSOR_1.gyroDataX =(angular_velocity.x );  //Convert dps to rad/s
+	//  SENSOR_1.gyroDataY =(angular_velocity.y );
+	//  SENSOR_1.gyroDataZ =(angular_velocity.z );
+	  SENSOR_1.gyroDataX =(angular_velocity.x * 0.0012215)/1000;  //Convert dps to rad/s  0.07 * 0.01745
+	  SENSOR_1.gyroDataY =(angular_velocity.y * 0.0012215)/1000;
+	  SENSOR_1.gyroDataZ =(angular_velocity.z * 0.0012215)/1000;
   }
 
 
@@ -434,9 +458,9 @@ static void Magneto_Sensor_Handler(uint32_t Instance)
   }
   else
   {
-	    SENSOR_1.magDataX =(int)magnetic_field.x;
-	    SENSOR_1.magDataY =(int)magnetic_field.y;
-	    SENSOR_1.magDataZ =(int)magnetic_field.z;
+	    SENSOR_1.magDataX = magnetic_field.x * 0.00015;  //Convert mGuass to uT
+	    SENSOR_1.magDataY = magnetic_field.y * 0.00015;
+	    SENSOR_1.magDataZ = magnetic_field.z * 0.00015;
   }
 
   /* TODO Create micro-ROS 2 message and message log for MEM capability

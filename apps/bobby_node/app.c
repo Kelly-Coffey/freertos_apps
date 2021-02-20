@@ -92,6 +92,16 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 						imu_data.x = SENSOR_1.angle_x;
 						imu_data.y = SENSOR_1.angle_y;
 						imu_data.z = SENSOR_1.angle_z;
+						imu_data.w = SENSOR_1.w;
+
+					//	imu_data.x = SENSOR_1.magDataX;
+					//	imu_data.y = SENSOR_1.magDataY;
+					//	imu_data.z = SENSOR_1.magDataZ;
+
+					//	imu_data.x = SENSOR_1.gyroDataX;
+					//	imu_data.y = SENSOR_1.gyroDataY;
+					//	imu_data.z = SENSOR_1.gyroDataZ;
+
 
 					//	imu_data.linear.x = SENSOR_1.accelDataX;
 					//	imu_data.linear.y = SENSOR_1.accelDataY;
