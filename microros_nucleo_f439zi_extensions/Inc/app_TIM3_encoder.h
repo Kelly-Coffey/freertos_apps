@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * File Name          : app_btn8962ta_motor.h
+  * File Name          : app_TIM3_Encode.h
   * Description        : This file provides code for the configuration
   *                      of the STM32 Timer1 and BTN8962TA Half-Bridge or Full-Bridge
   ******************************************************************************

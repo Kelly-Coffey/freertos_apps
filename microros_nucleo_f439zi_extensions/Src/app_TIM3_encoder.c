@@ -40,13 +40,14 @@ static uint8_t verbose = 1;  /* Verbose output to UART terminal ON/OFF. */
 struct encoder ENCODER_1;
 QueueHandle_t encoderQueueHandle;
 float previousPosition = 0;
-const maximumPosition = 4096
+const int maximumPosition = 4095;
 
+extern TIM_HandleTypeDef htim3;
 
 
 /* Private function prototypes -----------------------------------------------*/
-static void MX_Encoder_Init(void);
-static void MX_Encoder_Process(void);
+static void MX_TIM3encoder_Init(void);
+static void MX_TIM3encoder_Process(void);
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim3;
@@ -92,9 +93,10 @@ void MX_Encoder_Process(void)
   */
 void MX_TIM3encoder_Init(void)
 {
-
-	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
-
+	  if (HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
 }
 
 
@@ -105,13 +107,15 @@ void MX_TIM3encoder_Init(void)
 void MX_TIM3encoder_Process(void)
 {
 	float currentPosition;
-	const float radspertick = maximumPosition/(2*3.14759);
+	const float radspertick = (2*3.14759)/maximumPosition;
 
-	currentPosition = (float) TIM3->CNT;
+	//currentPosition = (float) TIM3->CNT;
+	currentPosition = (float) htim3.Instance->CNT;
 
-	ENCODER_1.position = (previousPosition - currentPosition)*radspertick;
+	ENCODER_1.position = (currentPosition)*radspertick;
 
 	ENCODER_1.radspsec  = ((previousPosition - currentPosition)*radspertick/0.100) ;
+	previousPosition = currentPosition;
 	  if (! xQueueSend(encoderQueueHandle,&ENCODER_1,100)){
 		  printf("Failed to write sensor data to QueueHandle\n");
 		}

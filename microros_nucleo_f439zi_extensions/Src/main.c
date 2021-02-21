@@ -243,6 +243,7 @@ int main(void)
 
 	MX_MEMS_Init();
 	MX_MOTOR_Init();
+	MX_Encoder_Init();
 //	PCC_Queue_Handle = xQueueCreate(3,sizeof(PCC_1));
   /* USER CODE END 2 */
   /* Init scheduler */
@@ -591,7 +592,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 0;
+  htim3.Init.Period = 4095;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   sConfig.EncoderMode = TIM_ENCODERMODE_TI1;
@@ -953,7 +954,8 @@ void StartMechTask(void *argument)
   /* Infinite loop */
   for(;;)
   {  while (1){
-	  MX_MOTOR_Process();
+	  //MX_MOTOR_Process();
+	  MX_Encoder_Process();
 	  osDelay(100);
   	  }
     osDelay(1);
