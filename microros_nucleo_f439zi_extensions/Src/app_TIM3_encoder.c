@@ -40,7 +40,9 @@ static uint8_t verbose = 1;  /* Verbose output to UART terminal ON/OFF. */
 struct encoder ENCODER_1;
 QueueHandle_t encoderQueueHandle;
 float previousPosition = 0;
-const int maximumPosition = 4095;
+
+//https://sdrobots.com/tech-thursday-029-encoder-cpr-resisted/
+const int MotorCPR = 6707;
 
 extern TIM_HandleTypeDef htim3;
 
@@ -107,14 +109,54 @@ void MX_TIM3encoder_Init(void)
 void MX_TIM3encoder_Process(void)
 {
 	float currentPosition;
-	const float radspertick = (2*3.14759)/maximumPosition;
+	const float radspertick = (2*3.14759)/MotorCPR; // Update CubeMX TIM Counter Period setting
+	int forward, backward;
 
+	//
 	//currentPosition = (float) TIM3->CNT;
 	currentPosition = (float) htim3.Instance->CNT;
 
 	ENCODER_1.position = (currentPosition)*radspertick;
 
-	ENCODER_1.radspsec  = ((previousPosition - currentPosition)*radspertick/0.100) ;
+
+	// MOTOR DIRECTIONS DIRECT FROM HARDWARE PINS
+	forward = HAL_GPIO_ReadPin(GPIOE,HB0_P_EN_Pin);
+	backward = HAL_GPIO_ReadPin(GPIOE,HB0_N_EN_Pin);
+
+
+	if (forward == 1 && backward == 0){
+		//FORWARD
+		if (currentPosition == previousPosition)
+			ENCODER_1.radspsec = 0;
+		else {
+			if (currentPosition > previousPosition)
+				ENCODER_1.radspsec  = (currentPosition-previousPosition)*radspertick;
+			else
+				ENCODER_1.radspsec  = (currentPosition + MotorCPR - previousPosition)*radspertick;
+			}
+	}
+
+	if (forward == 0 && backward == 1){
+		//BACKWARD
+		if (currentPosition == previousPosition)
+			ENCODER_1.radspsec = 0;
+		else {
+			if (currentPosition < previousPosition)
+				ENCODER_1.radspsec  = (currentPosition - previousPosition)*radspertick;
+			else
+				ENCODER_1.radspsec  = (currentPosition - MotorCPR - previousPosition)*radspertick;
+			}
+	}
+
+	if ( (forward == 0 && backward == 0) || (forward == 1 && backward == 1) ){
+		//BACKWARD
+		if (currentPosition == previousPosition)
+			ENCODER_1.radspsec = 0;
+		else {
+			ENCODER_1.radspsec  = (currentPosition - previousPosition)*radspertick;
+			}
+	}
+
 	previousPosition = currentPosition;
 	  if (! xQueueSend(encoderQueueHandle,&ENCODER_1,100)){
 		  printf("Failed to write sensor data to QueueHandle\n");
