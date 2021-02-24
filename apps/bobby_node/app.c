@@ -24,9 +24,9 @@
 #include "timers.h"
 #include "main.h"
 
-#include <geometry_msgs/msg/point32.h>
-#include <geometry_msgs/msg/accel.h>
 #include <sensor_msgs/msg/imu.h>
+#include <sensor_msgs/msg/joint_state.h>
+
 #define STRING_BUFFER_LEN 100
 //#define STRING_BUFFER_LEN 50
 extern QueueHandle_t sensorQueueHandle;
@@ -47,8 +47,13 @@ std_msgs__msg__Header outcoming_ping;
 std_msgs__msg__Header incoming_pong;
 
 // Bobby Code Start //
-rcl_publisher_t imu_publisher;
-geometry_msgs__msg__Quaternion imu_data;
+rcl_publisher_t jointstate_publisher;
+#define ARRAY_SIZE 1
+//sensor_msgs__msg__JointState jointstate_data;
+sensor_msgs__msg__JointState msg;
+static double position_buffer[ARRAY_SIZE];
+static double velocity_buffer[ARRAY_SIZE];
+
 // Bobby Code End //
 
 int device_id;
@@ -77,13 +82,13 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 		printf("Ping send seq %s\n", outcoming_ping.frame_id.data);
 
 
-		if(xQueueReceive(sensorQueueHandle, &PCC_1, 90)){
+		//if(xQueueReceive(sensorQueueHandle, &PCC_1, 90)){
 						// Publish IMU
 						//imu_data.x = PCC_1.accelDataX;
 						//imu_data.y = PCC_1.accelDataY;
 						//imu_data.z = PCC_1.accelDataZ;
-						imu_data.z = 0;
-
+	//					imu_data.z = 0;
+//
 
 						//imu_data.linear.x = PCC_1.accelDataX;
 					    //imu_data.linear.y = PCC_1.accelDataY;
@@ -93,28 +98,20 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 						//imu_data.angular.z = PCC_1.gyroDataZ;
 						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
 						//rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
-				}
+		//		}
 
 		if(xQueueReceive(encoderQueueHandle, &ENCODER_1, 90)){
-						// Publish IMU
-						//imu_data.x = PCC_1.accelDataX;
-						//imu_data.y = PCC_1.accelDataY;
-						//imu_data.z = PCC_1.accelDataZ;
-						imu_data.x = ENCODER_1.position; // degrees in radians
-						imu_data.y = ENCODER_1.radspsec; //radians per second
-						//imu_data.angular.z = ENCODER_1.target;
+						// Publish Joint State
 
-						//imu_data.linear.x = PCC_1.accelDataX;
-					    //imu_data.linear.y = PCC_1.accelDataY;
-						//imu_data.linear.z = PCC_1.accelDataZ;
-						//imu_data.angular.x = PCC_1.gyroDataX;
-						//imu_data.angular.y = PCC_1.gyroDataY;
-						//imu_data.angular.z = PCC_1.gyroDataZ;
+			position_buffer[0] = ENCODER_1.position; // degrees in radians
+			msg.position.data = position_buffer; // degrees in radians
+
+			velocity_buffer[0] = ENCODER_1.radspsec; //radians per second
+			msg.velocity.data = velocity_buffer; //radians per second
+
 						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
-						rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
+						rcl_publish(&jointstate_publisher, (const void*)&msg, NULL);
 				}
-
-
 
 	}
 }
@@ -179,14 +176,9 @@ void appMain(void *argument)
 
 	// Bobby Code Start //
 	// Create a best effort pong publisher
-	RCCHECK(rclc_publisher_init_best_effort(&imu_publisher, &node,
-					ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Quaternion), "/geometry/quaternion"));
 
-
-//	rcl_publisher_init(&imu_publisher, &node,
-	//		ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Quaternion), "/geometry/quaternion", &imu_publisher_ops);
-
-
+	RCCHECK(rclc_publisher_init_best_effort(&jointstate_publisher, &node,
+					ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState), "/sensor/jointstate"));
 
 	// Bobby Code End //
 
@@ -214,6 +206,19 @@ void appMain(void *argument)
 	incoming_pong.frame_id.capacity = STRING_BUFFER_LEN;
 
 	device_id = rand();
+
+
+	// ADD BOBBY
+	// Using static memory
+	msg.velocity.capacity = ARRAY_SIZE;
+	msg.velocity.size = ARRAY_SIZE;
+	msg.velocity.data = velocity_buffer;
+
+	msg.position.capacity = ARRAY_SIZE;
+	msg.position.size = ARRAY_SIZE;
+	msg.position.data = position_buffer;
+
+	//END BOBBY
 
 	while(1){
 		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
