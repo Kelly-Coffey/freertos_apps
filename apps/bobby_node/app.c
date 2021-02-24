@@ -47,10 +47,11 @@ std_msgs__msg__Header outcoming_ping;
 std_msgs__msg__Header incoming_pong;
 
 // Bobby Code Start //
+
 rcl_publisher_t jointstate_publisher;
 #define ARRAY_SIZE 1
 //sensor_msgs__msg__JointState jointstate_data;
-sensor_msgs__msg__JointState msg;
+sensor_msgs__msg__JointState jointstate_data;
 static double position_buffer[ARRAY_SIZE];
 static double velocity_buffer[ARRAY_SIZE];
 
@@ -82,37 +83,18 @@ void ping_timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 		printf("Ping send seq %s\n", outcoming_ping.frame_id.data);
 
 
-		//if(xQueueReceive(sensorQueueHandle, &PCC_1, 90)){
-						// Publish IMU
-						//imu_data.x = PCC_1.accelDataX;
-						//imu_data.y = PCC_1.accelDataY;
-						//imu_data.z = PCC_1.accelDataZ;
-	//					imu_data.z = 0;
-//
-
-						//imu_data.linear.x = PCC_1.accelDataX;
-					    //imu_data.linear.y = PCC_1.accelDataY;
-						//imu_data.linear.z = PCC_1.accelDataZ;
-						//imu_data.angular.x = PCC_1.gyroDataX;
-						//imu_data.angular.y = PCC_1.gyroDataY;
-						//imu_data.angular.z = PCC_1.gyroDataZ;
-						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
-						//rcl_publish(&imu_publisher, (const void*)&imu_data, NULL);
-		//		}
-
 		if(xQueueReceive(encoderQueueHandle, &ENCODER_1, 90)){
 						// Publish Joint State
 
 			position_buffer[0] = ENCODER_1.position; // degrees in radians
-			msg.position.data = position_buffer; // degrees in radians
+			jointstate_data.position.data = position_buffer; // degrees in radians
 
 			velocity_buffer[0] = ENCODER_1.radspsec; //radians per second
-			msg.velocity.data = velocity_buffer; //radians per second
+			jointstate_data.velocity.data = velocity_buffer; //radians per second
 
 						//printf("IMU: [%.2f, %.2f, %.2f] m/s^2\n",  imu_data.x, imu_data.y, imu_data.z);
-						rcl_publish(&jointstate_publisher, (const void*)&msg, NULL);
+						rcl_publish(&jointstate_publisher, (const void*)&jointstate_data, NULL);
 				}
-
 	}
 }
 
@@ -175,7 +157,7 @@ void appMain(void *argument)
 
 
 	// Bobby Code Start //
-	// Create a best effort pong publisher
+	// Create a best effort jointstate publisher
 
 	RCCHECK(rclc_publisher_init_best_effort(&jointstate_publisher, &node,
 					ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState), "/sensor/jointstate"));
@@ -208,17 +190,18 @@ void appMain(void *argument)
 	device_id = rand();
 
 
-	// ADD BOBBY
+	// Bobby Code Start //
 	// Using static memory
-	msg.velocity.capacity = ARRAY_SIZE;
-	msg.velocity.size = ARRAY_SIZE;
-	msg.velocity.data = velocity_buffer;
 
-	msg.position.capacity = ARRAY_SIZE;
-	msg.position.size = ARRAY_SIZE;
-	msg.position.data = position_buffer;
+	jointstate_data.velocity.capacity = ARRAY_SIZE;
+	jointstate_data.velocity.size = ARRAY_SIZE;
+	jointstate_data.velocity.data = velocity_buffer;
 
-	//END BOBBY
+	jointstate_data.position.capacity = ARRAY_SIZE;
+	jointstate_data.position.size = ARRAY_SIZE;
+	jointstate_data.position.data = position_buffer;
+
+	// Bobby Code Stop //
 
 	while(1){
 		rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
