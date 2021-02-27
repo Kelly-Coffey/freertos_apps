@@ -50,6 +50,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 typedef StaticQueue_t osStaticMessageQDef_t;
+typedef StaticSemaphore_t osStaticMutexDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -99,6 +100,13 @@ const osThreadAttr_t MechTask_attributes = {
   .priority = (osPriority_t) osPriorityBelowNormal,
   .stack_size = 1500
 };
+/* Definitions for EncoderTask */
+osThreadId_t EncoderTaskHandle;
+const osThreadAttr_t EncoderTask_attributes = {
+  .name = "EncoderTask",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 512
+};
 /* Definitions for sensorQueue */
 osMessageQueueId_t sensorQueueHandle;
 uint8_t sensorQueueBuffer[ 3 * sizeof( pcc ) ];
@@ -132,6 +140,14 @@ const osMessageQueueAttr_t encoderQueue_attributes = {
   .mq_mem = &encoderQueueBuffer,
   .mq_size = sizeof(encoderQueueBuffer)
 };
+/* Definitions for Tim3Mutex */
+osMutexId_t Tim3MutexHandle;
+osStaticMutexDef_t Tim3MutexControlBlock;
+const osMutexAttr_t Tim3Mutex_attributes = {
+  .name = "Tim3Mutex",
+  .cb_mem = &Tim3MutexControlBlock,
+  .cb_size = sizeof(Tim3MutexControlBlock),
+};
 /* USER CODE BEGIN PV */
 uint8_t SensorReadRequest = 0;
 struct pcc PCC_1;
@@ -158,6 +174,7 @@ static void MX_ADC3_Init(void);
 void StartDefaultTask(void *argument);
 void StartSensorTask(void *argument);
 void StartMechTask(void *argument);
+void StartEncoderTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 #define BUFSIZE 4096
@@ -248,6 +265,9 @@ int main(void)
   /* USER CODE END 2 */
   /* Init scheduler */
   osKernelInitialize();
+  /* Create the mutex(es) */
+  /* creation of Tim3Mutex */
+  Tim3MutexHandle = osMutexNew(&Tim3Mutex_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -284,6 +304,9 @@ int main(void)
 
   /* creation of MechTask */
   MechTaskHandle = osThreadNew(StartMechTask, NULL, &MechTask_attributes);
+
+  /* creation of EncoderTask */
+  EncoderTaskHandle = osThreadNew(StartEncoderTask, NULL, &EncoderTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -954,13 +977,30 @@ void StartMechTask(void *argument)
   /* Infinite loop */
   for(;;)
   {  while (1){
-	  //MX_MOTOR_Process();
-	  MX_Encoder_Process();
-	  osDelay(100);
+	  MX_MOTOR_Process();
+	  osDelay(24);
   	  }
-    osDelay(1);
   }
   /* USER CODE END StartMechTask */
+}
+
+/* USER CODE BEGIN Header_StartEncoderTask */
+/**
+* @brief Function implementing the EncoderTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartEncoderTask */
+void StartEncoderTask(void *argument)
+{
+  /* USER CODE BEGIN StartEncoderTask */
+  /* Infinite loop */
+  for(;;)
+  {
+	MX_Encoder_Process();
+    osDelay(100);
+  }
+  /* USER CODE END StartEncoderTask */
 }
 
 /**

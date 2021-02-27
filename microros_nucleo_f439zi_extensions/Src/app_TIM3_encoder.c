@@ -33,6 +33,8 @@
 #include "queue.h"
 #include "task.h"
 #include "timers.h"
+#include "cmsis_os.h"
+#include "semphr.h"
 
 /* Private variables ---------------------------------------------------------*/
 static uint8_t verbose = 1;  /* Verbose output to UART terminal ON/OFF. */
@@ -43,7 +45,6 @@ float previousPosition = 0;
 
 //https://sdrobots.com/tech-thursday-029-encoder-cpr-resisted/
 const int MotorCPR = 6707;
-
 extern TIM_HandleTypeDef htim3;
 
 
@@ -53,6 +54,7 @@ static void MX_TIM3encoder_Process(void);
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim3;
+extern osMutexId_t Tim3MutexHandle;
 
 void MX_Encoder_Init(void)
 {
@@ -113,8 +115,9 @@ void MX_TIM3encoder_Process(void)
 	int forward, backward;
 
 	//
-	//currentPosition = (float) TIM3->CNT;
+	xSemaphoreTake(Tim3MutexHandle, portMAX_DELAY);
 	currentPosition = (float) htim3.Instance->CNT;
+	xSemaphoreGive(Tim3MutexHandle);
 
 	ENCODER_1.position = (currentPosition)*radspertick;
 
@@ -162,6 +165,7 @@ void MX_TIM3encoder_Process(void)
 		  printf("Failed to write sensor data to QueueHandle\n");
 		}
 }
+
 
 #ifdef __cplusplus
 }
