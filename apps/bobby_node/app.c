@@ -26,6 +26,7 @@
 
 #include <sensor_msgs/msg/imu.h>
 #include <sensor_msgs/msg/joint_state.h>
+#include <std_msgs/msg/float64_multi_array.h>
 
 #define STRING_BUFFER_LEN 100
 //#define STRING_BUFFER_LEN 50
@@ -54,6 +55,18 @@ rcl_publisher_t jointstate_publisher;
 sensor_msgs__msg__JointState jointstate_data;
 static double position_buffer[ARRAY_SIZE];
 static double velocity_buffer[ARRAY_SIZE];
+
+std_msgs__msg__Float64MultiArray motorcontrol_data;
+static rosidl_runtime_c__double__Sequence target_buffer[ARRAY_SIZE];
+
+rcl_subscription_t position_subscriber;
+std_msgs__msg__Float64MultiArray incoming_position;
+
+//Work to receive following ROS2 Message
+//std_msgs.msg.Float64MultiArray(layout=std_msgs.msg.MultiArrayLayout(dim=[], data_offset=0), data=[0.5, 0.5])
+
+
+
 
 // Bobby Code End //
 
@@ -121,7 +134,12 @@ void pong_subscription_callback(const void * msgin)
 }
 
 
+void position_subscription_callback(const void * msgin)
+{
 
+		printf("Position.....Wow\n");
+
+}
 
 void appMain(void *argument)
 {
@@ -162,6 +180,12 @@ void appMain(void *argument)
 	RCCHECK(rclc_publisher_init_best_effort(&jointstate_publisher, &node,
 					ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState), "/sensor/jointstate"));
 
+
+	// Create a best effort  pong subscriber
+	RCCHECK(rclc_subscription_init_best_effort(&position_subscriber, &node,
+		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float64MultiArray), "/forward_command_controller_position/commands"));
+
+
 	// Bobby Code End //
 
 
@@ -173,6 +197,9 @@ void appMain(void *argument)
 		&ping_subscription_callback, ON_NEW_DATA));
 	RCCHECK(rclc_executor_add_subscription(&executor, &pong_subscriber, &incoming_pong,
 		&pong_subscription_callback, ON_NEW_DATA));
+
+	RCCHECK(rclc_executor_add_subscription(&executor, &position_subscriber, &incoming_position,
+		&position_subscription_callback, ON_NEW_DATA));
 
 	// Create and allocate the pingpong messages
 	char outcoming_ping_buffer[STRING_BUFFER_LEN];
@@ -201,6 +228,9 @@ void appMain(void *argument)
 	jointstate_data.position.size = ARRAY_SIZE;
 	jointstate_data.position.data = position_buffer;
 
+
+	motorcontrol_data.data = target_buffer[0];
+
 	// Bobby Code Stop //
 
 	while(1){
@@ -213,5 +243,6 @@ void appMain(void *argument)
 	RCCHECK(rcl_publisher_fini(&pong_publisher, &node));
 	RCCHECK(rcl_subscription_fini(&ping_subscriber, &node));
 	RCCHECK(rcl_subscription_fini(&pong_subscriber, &node));
+	RCCHECK(rcl_subscription_fini(&position_subscriber, &node));
 	RCCHECK(rcl_node_fini(&node));
 }
