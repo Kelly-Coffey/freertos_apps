@@ -56,11 +56,11 @@ sensor_msgs__msg__JointState jointstate_data;
 static double position_buffer[ARRAY_SIZE];
 static double velocity_buffer[ARRAY_SIZE];
 
+
+rcl_subscription_t position_subscriber;
 std_msgs__msg__Float64MultiArray motorcontrol_data;
 static rosidl_runtime_c__double__Sequence target_buffer[ARRAY_SIZE];
 
-rcl_subscription_t position_subscriber;
-std_msgs__msg__Float64MultiArray incoming_position;
 
 //Work to receive following ROS2 Message
 //std_msgs.msg.Float64MultiArray(layout=std_msgs.msg.MultiArrayLayout(dim=[], data_offset=0), data=[0.5, 0.5])
@@ -198,7 +198,7 @@ void appMain(void *argument)
 	RCCHECK(rclc_executor_add_subscription(&executor, &pong_subscriber, &incoming_pong,
 		&pong_subscription_callback, ON_NEW_DATA));
 
-	RCCHECK(rclc_executor_add_subscription(&executor, &position_subscriber, &incoming_position,
+	RCCHECK(rclc_executor_add_subscription(&executor, &position_subscriber, &motorcontrol_data,
 		&position_subscription_callback, ON_NEW_DATA));
 
 	// Create and allocate the pingpong messages
@@ -228,7 +228,8 @@ void appMain(void *argument)
 	jointstate_data.position.size = ARRAY_SIZE;
 	jointstate_data.position.data = position_buffer;
 
-
+	motorcontrol_data.data.capacity = ARRAY_SIZE;
+	motorcontrol_data.data.size = ARRAY_SIZE;
 	motorcontrol_data.data = target_buffer[0];
 
 	// Bobby Code Stop //
