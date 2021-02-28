@@ -32,6 +32,7 @@
 //#define STRING_BUFFER_LEN 50
 extern QueueHandle_t sensorQueueHandle;
 extern QueueHandle_t encoderQueueHandle;
+extern QueueHandle_t motorctrlQueueHandle;
 // Bobby Code End //
 
 
@@ -56,10 +57,10 @@ sensor_msgs__msg__JointState jointstate_data;
 static double position_buffer[ARRAY_SIZE];
 static double velocity_buffer[ARRAY_SIZE];
 
-
+#define ARRAY_SIZE_2 2
 rcl_subscription_t position_subscriber;
 std_msgs__msg__Float64MultiArray motorcontrol_data;
-static rosidl_runtime_c__double__Sequence target_buffer[ARRAY_SIZE];
+static rosidl_runtime_c__double__Sequence target_buffer[ARRAY_SIZE_2];
 
 
 //Work to receive following ROS2 Message
@@ -136,8 +137,15 @@ void pong_subscription_callback(const void * msgin)
 
 void position_subscription_callback(const void * msgin)
 {
-
+float tempvalue;
 		printf("Position.....Wow\n");
+		target_buffer->data = motorcontrol_data.data.data;
+		MOTORCTRL_1.target=(float)*target_buffer[0].data;
+
+		  if (! xQueueSend(motorctrlQueueHandle, &MOTORCTRL_1,100)){
+			  printf("Failed to write motor data to QueueHandle\n");
+			}
+
 
 }
 
@@ -169,17 +177,11 @@ void appMain(void *argument)
 	RCCHECK(rclc_subscription_init_best_effort(&pong_subscriber, &node,
 		ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Header), "/microROS/pong"));
 
-	// Create a 1000 milli seconds ping timer timer,
-	rcl_timer_t timer;
-	RCCHECK(rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(100), ping_timer_callback));
-
-
 	// Bobby Code Start //
 	// Create a best effort jointstate publisher
 
 	RCCHECK(rclc_publisher_init_best_effort(&jointstate_publisher, &node,
 					ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState), "/sensor/jointstate"));
-
 
 	// Create a best effort  pong subscriber
 	RCCHECK(rclc_subscription_init_best_effort(&position_subscriber, &node,
@@ -188,10 +190,13 @@ void appMain(void *argument)
 
 	// Bobby Code End //
 
+	// Create a 1000 milli seconds ping timer timer,
+	rcl_timer_t timer;
+	RCCHECK(rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(100), ping_timer_callback));
 
 	// Create executor
 	rclc_executor_t executor;
-	RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+	RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
 	RCCHECK(rclc_executor_add_timer(&executor, &timer));
 	RCCHECK(rclc_executor_add_subscription(&executor, &ping_subscriber, &incoming_ping,
 		&ping_subscription_callback, ON_NEW_DATA));
@@ -216,6 +221,7 @@ void appMain(void *argument)
 
 	device_id = rand();
 
+	double myData = 1.34;
 
 	// Bobby Code Start //
 	// Using static memory
@@ -228,9 +234,20 @@ void appMain(void *argument)
 	jointstate_data.position.size = ARRAY_SIZE;
 	jointstate_data.position.data = position_buffer;
 
-	motorcontrol_data.data.capacity = ARRAY_SIZE;
-	motorcontrol_data.data.size = ARRAY_SIZE;
-	motorcontrol_data.data = target_buffer[0];
+	target_buffer[0].data = &myData;
+	char myString[7] = "Joint1 ";
+	rosidl_runtime_c__String myNamestruct;
+
+	myNamestruct.data = &myString;
+
+	motorcontrol_data.layout.dim.data->label.data = &myString;
+	motorcontrol_data.layout.data_offset = 0;
+	motorcontrol_data.layout.dim.size = 2;
+	motorcontrol_data.layout.dim.capacity = 2;
+	motorcontrol_data.data.capacity = 2;
+	motorcontrol_data.data.size = 2;
+	//motorcontrol_data.data = target_buffer[0];
+	motorcontrol_data.data.data = target_buffer->data;
 
 	// Bobby Code Stop //
 

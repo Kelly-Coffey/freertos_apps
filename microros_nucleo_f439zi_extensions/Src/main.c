@@ -84,28 +84,28 @@ osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .priority = (osPriority_t) osPriorityAboveNormal,
-  .stack_size = 1500
+  .stack_size = 4500
 };
 /* Definitions for SensorTask */
 osThreadId_t SensorTaskHandle;
 const osThreadAttr_t SensorTask_attributes = {
   .name = "SensorTask",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 3000
+  .stack_size = 1500
 };
 /* Definitions for MechTask */
 osThreadId_t MechTaskHandle;
 const osThreadAttr_t MechTask_attributes = {
   .name = "MechTask",
   .priority = (osPriority_t) osPriorityBelowNormal,
-  .stack_size = 1500
+  .stack_size = 1000
 };
 /* Definitions for EncoderTask */
 osThreadId_t EncoderTaskHandle;
 const osThreadAttr_t EncoderTask_attributes = {
   .name = "EncoderTask",
   .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 512
+  .stack_size = 1000
 };
 /* Definitions for sensorQueue */
 osMessageQueueId_t sensorQueueHandle;
@@ -906,7 +906,7 @@ void StartDefaultTask(void *argument)
   osThreadAttr_t attributes;
   memset(&attributes, 0x0, sizeof(osThreadAttr_t));
   attributes.name = "microROS_app";
-  attributes.stack_size = 5*3000;
+  attributes.stack_size = 7*3000;
   attributes.priority = (osPriority_t) osPriorityNormal1;
   osThreadNew(appMain, NULL, &attributes);
 
