@@ -128,10 +128,10 @@ void MX_BTN8962TA_Process(void)
 
 		direction = shortestSignedDistanceBetweenCircularValues((currentPosition)*radspertick, MOTORCTRL_1.target);
 		MOTORCTRL_1.direction = 0;
-		if (direction > 0.08) MOTORCTRL_1.direction = 1;
-		if (direction < -0.08) MOTORCTRL_1.direction = 2;
+		if (direction > 0.1) MOTORCTRL_1.direction = 1;
+		if (direction < -0.1) MOTORCTRL_1.direction = 2;
 
-		magnitude = 500; //50% of MaxMagnitude
+		magnitude = 100; //50% of MaxMagnitude
 
 		switch ((int)MOTORCTRL_1.direction){
 			case 1:
@@ -160,11 +160,11 @@ void MX_BTN8962TA_Process(void)
 // BOBBY First measure the location and direction
 		direction = shortestSignedDistanceBetweenCircularValues((currentPosition)*radspertick, MOTORCTRL_1.target);
 		MOTORCTRL_1.direction = 0;
-		if (direction > 0.08) MOTORCTRL_1.direction = 1;
-		if (direction < -0.08) MOTORCTRL_1.direction = 2;
+		if (direction > 0.1) MOTORCTRL_1.direction = 1;
+		if (direction < -0.1) MOTORCTRL_1.direction = 2;
 
 // BOBBY Second calculate output power based on a controller input
-		MOTORCTRL_1.power = 500; //50% of MaxMagnitude
+		MOTORCTRL_1.power = 100; //50% of MaxMagnitude
 
 		switch ((int)MOTORCTRL_1.direction){
 			case 1:

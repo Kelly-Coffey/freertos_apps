@@ -221,7 +221,7 @@ void appMain(void *argument)
 
 	device_id = rand();
 
-	double myData = 1.34;
+
 
 	// Bobby Code Start //
 	// Using static memory
@@ -234,20 +234,27 @@ void appMain(void *argument)
 	jointstate_data.position.size = ARRAY_SIZE;
 	jointstate_data.position.data = position_buffer;
 
-	target_buffer[0].data = &myData;
+
+
+	double Joint1_Position = 0.34;
+	target_buffer[0].data = &Joint1_Position;
+	double Joint2_Position = 5.12;
+	target_buffer[1].data = &Joint2_Position;
 	char myString[7] = "Joint1 ";
 	rosidl_runtime_c__String myNamestruct;
 
 	myNamestruct.data = &myString;
 
 	motorcontrol_data.layout.dim.data->label.data = &myString;
+	motorcontrol_data.layout.dim.data->label.size = 7;
+	motorcontrol_data.layout.dim.data->stride = 0;
 	motorcontrol_data.layout.data_offset = 0;
 	motorcontrol_data.layout.dim.size = 2;
 	motorcontrol_data.layout.dim.capacity = 2;
 	motorcontrol_data.data.capacity = 2;
 	motorcontrol_data.data.size = 2;
 	//motorcontrol_data.data = target_buffer[0];
-	motorcontrol_data.data.data = target_buffer->data;
+	motorcontrol_data.data.data = target_buffer[0].data;
 
 	// Bobby Code Stop //
 
